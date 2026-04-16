@@ -467,7 +467,7 @@ def train_stacking(m_xgb, m_lgbm, X_tr, y_tr, X_te, y_te, label="BUY") -> tuple:
 
         X_str = np.column_stack([oof_xgb, oof_lgb, (oof_xgb+oof_lgb)/2, oof_xgb-oof_lgb])
         scaler = StandardScaler()
-        sm = LogisticRegression(C=1.0, max_iter=500, random_state=42)
+        sm = LogisticRegression(C=1.0, max_iter=500, random_state=42, class_weight='balanced')
         sm.fit(scaler.fit_transform(X_str), y_tr)
         yp = sm.predict(scaler.transform(X_st))
         ypr = sm.predict_proba(scaler.transform(X_st))[:,1]

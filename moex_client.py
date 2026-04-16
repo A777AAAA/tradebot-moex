@@ -208,7 +208,9 @@ def get_imoex(limit: int = 20) -> pd.DataFrame:
     """Данные индекса IMOEX для макро-фильтра."""
     try:
         url  = f"{ISS_BASE}/engines/stock/markets/index/boards/SNDX/securities/IMOEX/candles.json"
-        data = _get(url, {"interval": 60, "limit": limit})
+        from datetime import datetime, timedelta
+        date_from = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+        data = _get(url, {"interval": 60, "limit": limit, "from": date_from})
         raw  = _parse_candles(data)
         if raw:
             return candles_to_df(raw)

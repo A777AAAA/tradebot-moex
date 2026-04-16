@@ -123,7 +123,7 @@ def get_imoex_change() -> float:
     if now - _imoex_cache["ts"] < _IMOEX_TTL:
         return _imoex_cache["change"]
     try:
-        df = get_imoex(limit=5)
+        df = get_imoex(limit=50)
         if not df.empty and len(df) >= 2:
             ch = float((df["Close"].iloc[-1] - df["Close"].iloc[-2]) / df["Close"].iloc[-2] * 100)
             _imoex_cache.update({"change": ch, "ts": now})
@@ -145,7 +145,7 @@ def _get_data_for_ticker(ticker: str) -> tuple:
         return cache.get("df1h"), cache.get("df4h")
 
     try:
-        raw = get_candles_multi(ticker, interval="60", total=500)
+        raw = get_candles_multi(ticker, interval="60", total=700)
         df_raw = candles_to_df(raw)
         if df_raw.empty or len(df_raw) < 100:
             logger.warning(f"[Signal] {ticker}: мало данных ({len(df_raw)} баров)")
