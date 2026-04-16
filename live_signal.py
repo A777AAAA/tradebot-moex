@@ -288,9 +288,9 @@ def get_signal_for_ticker(ticker: str) -> dict | None:
     # IMOEX фильтр (только для BUY)
     imoex_change  = 0.0
     imoex_blocked = False
-    if IMOEX_FILTER_ENABLED and signal == "BUY":
+    if IMOEX_FILTER_ENABLED:
         imoex_change = get_imoex_change()
-        if imoex_change < IMOEX_CHANGE_THRESH * 100:
+        if signal == "BUY" and imoex_change < IMOEX_CHANGE_THRESH * 100:
             filter_log.append(f"IMOEX={imoex_change:+.2f}%")
             signal        = "HOLD"
             imoex_blocked = True

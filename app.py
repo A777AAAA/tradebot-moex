@@ -198,7 +198,15 @@ def trading_loop():
                     send_message(_format_sl_message(event))
 
             # ── Получаем сигналы по всем инструментам ──
-            all_signals = get_all_signals(SYMBOLS_ALL)
+            import concurrent.futures as _cf
+            with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+                _fut = _ex.submit(get_all_signals, SYMBOLS_ALL)
+                try:
+                    all_signals = _fut.result(timeout=120)
+                except _cf.TimeoutError:
+                    logger.error("❌ Watchdog: get_all_signals завис >120s, пропускаем цикл")
+                    time.sleep(60)
+                    continue
 
             # Логируем все сигналы
             for sig in all_signals:
