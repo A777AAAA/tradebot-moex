@@ -341,13 +341,22 @@ def triple_barrier_labels(df: pd.DataFrame, horizon=None, tp_mult=None, sl_mult=
     df = df.copy()
     df["Target_BUY"]  = target_buy
     df["Target_SELL"] = target_sell
+    # HOLD: цена не вышла ни за TP ни за SL — боковик
+    target_hold = np.where(
+        np.isnan(target_buy) & np.isnan(target_sell), 1,
+        np.where((target_buy == 0) & (target_sell == 0), 1, 0)
+    ).astype(float)
+    target_hold[n - horizon:] = np.nan
+    df["Target_HOLD"] = target_hold
 
     total   = n - horizon
     bp = int(np.nansum(target_buy[:total]));  bv = int(np.sum(~np.isnan(target_buy[:total])))
     sp = int(np.nansum(target_sell[:total])); sv = int(np.sum(~np.isnan(target_sell[:total])))
+    hp = int(np.nansum(target_hold[:total])); hv = int(np.sum(~np.isnan(target_hold[:total])))
     logger.info(
         f"[Trainer] Triple Barrier: BUY pos={bp}/{bv} ({bp/(bv+1e-9):.1%}) | "
-        f"SELL pos={sp}/{sv} ({sp/(sv+1e-9):.1%})"
+        f"SELL pos={sp}/{sv} ({sp/(sv+1e-9):.1%}) | "
+        f"HOLD pos={hp}/{hv} ({hp/(hv+1e-9):.1%})"
     )
     return df
 

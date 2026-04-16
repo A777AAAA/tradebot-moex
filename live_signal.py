@@ -224,6 +224,8 @@ def get_signal_for_ticker(ticker: str) -> dict | None:
         p_sell_xgb  = float(models["sell_xgb"].predict_proba(X)[0][1]) if "sell_xgb"  in models else 0.5
         p_buy_lgbm  = float(models["buy_lgbm"].predict_proba(X)[0][1]) if "buy_lgbm"  in models else p_buy_xgb
         p_sell_lgbm = float(models["sell_lgbm"].predict_proba(X)[0][1])if "sell_lgbm" in models else p_sell_xgb
+        # p_hold: обратная вероятность — рынок не даёт чёткого направления
+        p_hold = max(0.0, 1.0 - p_buy_xgb - p_sell_xgb)
 
         p_buy_cal  = _get_calibrated_prob(models, X, "buy",  p_buy_xgb)
         p_sell_cal = _get_calibrated_prob(models, X, "sell", p_sell_xgb)
@@ -326,6 +328,7 @@ def get_signal_for_ticker(ticker: str) -> dict | None:
         "p_sell":        round(p_sell,     4),
         "p_buy_cal":     round(p_buy_cal,  4),
         "p_sell_cal":    round(p_sell_cal, 4),
+        "p_hold":        round(max(p_hold, 0.0), 4),
         "models_used":   models_used,
         "hurst":         round(hurst, 3),
         "regime":        regime,
