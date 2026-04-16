@@ -24,18 +24,20 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 from xgboost import XGBClassifier
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score, roc_auc_score
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, RidgeClassifierCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import TimeSeriesSplit
-
+try:
+    from catboost import CatBoostClassifier
+    CATBOOST_AVAILABLE = True
+except ImportError:
+    CATBOOST_AVAILABLE = False
 try:
     from imblearn.over_sampling import SMOTE
     SMOTE_AVAILABLE = True
 except ImportError:
     SMOTE_AVAILABLE = False
-
-try:
     import lightgbm as lgb
     LGBM_AVAILABLE = True
 except ImportError:
@@ -443,6 +445,20 @@ def calibrate_model(model, X_tr, y_tr, X_te, y_te, label="BUY") -> tuple:
         return model, {}
 
 
+def train_binary_cat(X_tr, y_tr, X_te, y_te, label="BUY"):
+    if not CATBOOST_AVAILABLE:
+        return None, None
+    try:
+        m = CatBoostClassifier(iterations=400, depth=6, learning_rate=0.03, loss_function="Logloss", eval_metric="AUC", random_seed=42, verbose=0, thread_count=-1)
+        m.fit(X_tr, y_tr, eval_set=(X_te, y_te), early_stopping_rounds=50)
+        from sklearn.metrics import precision_score
+        prec = precision_score(y_te, m.predict(X_te), zero_division=0)
+        logger.info(f"[CatBoost {label}] prec={prec:.3f}")
+        return m, prec
+    except Exception as e:
+        logger.warning(f"[CatBoost {label}] error: {e}")
+        return None, None
+
 def train_stacking(m_xgb, m_lgbm, X_tr, y_tr, X_te, y_te, label="BUY") -> tuple:
     if not LGBM_AVAILABLE or m_lgbm is None: return None, None
     try:
@@ -467,7 +483,7 @@ def train_stacking(m_xgb, m_lgbm, X_tr, y_tr, X_te, y_te, label="BUY") -> tuple:
 
         X_str = np.column_stack([oof_xgb, oof_lgb, (oof_xgb+oof_lgb)/2, oof_xgb-oof_lgb])
         scaler = StandardScaler()
-        sm = LogisticRegression(C=1.0, max_iter=500, random_state=42, class_weight='balanced')
+        sm = RidgeClassifierCV(alphas=[0.1, 1.0, 10.0], cv=5)
         sm.fit(scaler.fit_transform(X_str), y_tr)
         yp = sm.predict(scaler.transform(X_st))
         ypr = sm.predict_proba(scaler.transform(X_st))[:,1]
@@ -634,6 +650,9 @@ def train_ticker(ticker: str) -> dict:
     # 12. Stacking
     stack_b, stack_bm = train_stacking(b_xgb, b_lgbm, Xb_tr, yb_tr, Xb_te, yb_te, "BUY")
     stack_s, stack_sm = train_stacking(s_xgb, s_lgbm, Xs_tr, ys_tr, Xs_te, ys_te, "SELL")
+    # 12b. CatBoost
+    cat_b, cat_bm = train_binary_cat(Xb_tr, yb_tr, Xb_te, yb_te, "BUY")
+    cat_s, cat_sm = train_binary_cat(Xs_tr, ys_tr, Xs_te, ys_te, "SELL")
 
     # 13. Калибровка
     calib_b, calib_bm = calibrate_model(b_xgb, Xb_tr, yb_tr, Xb_te, yb_te, "BUY")
