@@ -246,6 +246,29 @@ def calc_indicators_1h(df: pd.DataFrame) -> pd.DataFrame:
     # Buy-the-Dip признаки
     d = calc_dip_features(d)
 
+    # MOEX-специфичные признаки v8.3
+    try:
+        import moex_client as mc
+        imoex = mc.fetch_imoex_close()
+        if imoex is not None and len(imoex) > 20:
+            imoex = imoex.reindex(d.index, method='ffill')
+            ticker_ret = d['close'].pct_change(1) if 'close' in d.columns else d['Close'].pct_change(1)
+            imoex_ret  = imoex.pct_change(1)
+            d['IMOEX_corr_20'] = ticker_ret.rolling(20).corr(imoex_ret)
+            cov = ticker_ret.rolling(20).cov(imoex_ret)
+            var = imoex_ret.rolling(20).var()
+            d['Beta_vs_IMOEX']  = cov / (var + 1e-9)
+            d['Alpha_vs_IMOEX'] = ticker_ret.rolling(20).mean() - d['Beta_vs_IMOEX'] * imoex_ret.rolling(20).mean()
+        else:
+            d['IMOEX_corr_20'] = 0.0
+            d['Beta_vs_IMOEX']  = 1.0
+            d['Alpha_vs_IMOEX'] = 0.0
+    except Exception:
+        d['IMOEX_corr_20'] = 0.0
+        d['Beta_vs_IMOEX']  = 1.0
+        d['Alpha_vs_IMOEX'] = 0.0
+    d['Month'] = d.index.month if hasattr(d.index, 'month') else 0
+
     return d
 
 
