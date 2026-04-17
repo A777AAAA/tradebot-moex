@@ -38,6 +38,8 @@ try:
     SMOTE_AVAILABLE = True
 except ImportError:
     SMOTE_AVAILABLE = False
+
+try:
     import lightgbm as lgb
     LGBM_AVAILABLE = True
 except ImportError:
@@ -142,6 +144,7 @@ def calc_indicators_1h(df: pd.DataFrame) -> pd.DataFrame:
 
     d["Hour"]      = d.index.hour
     d["DayOfWeek"] = d.index.dayofweek
+    d["Month"]     = d.index.month
 
     for p in [7, 14, 21]:
         diff = close.diff()
@@ -237,7 +240,10 @@ def calc_indicators_1h(df: pd.DataFrame) -> pd.DataFrame:
 
     bf = (close - low) / (high - low + 1e-9)
     bv = (high - close) / (high - low + 1e-9)
-    d["OFI"] = (bf * vol - bv * vol).rolling(10).sum() / (vol.rolling(10).sum() + 1e-9)
+    d["OFI"]       = (bf * vol - bv * vol).rolling(10).sum() / (vol.rolling(10).sum() + 1e-9)
+    d["OFI_5"]     = (d["OFI"] * vol).rolling(5).sum()  / (vol.rolling(5).sum()  + 1e-9)
+    d["OFI_20"]    = (d["OFI"] * vol).rolling(20).sum() / (vol.rolling(20).sum() + 1e-9)
+    d["OFI_ratio"] = d["OFI_5"] / (d["OFI_20"].abs() + 1e-9)
 
     ret1 = close.pct_change(1)
     d["Price_accel"] = ret1 - ret1.shift(1)
@@ -248,11 +254,11 @@ def calc_indicators_1h(df: pd.DataFrame) -> pd.DataFrame:
 
     # MOEX-специфичные признаки v8.3
     try:
-        import moex_client as mc
-        imoex = mc.fetch_imoex_close()
-        if imoex is not None and len(imoex) > 20:
-            imoex = imoex.reindex(d.index, method='ffill')
-            ticker_ret = d['close'].pct_change(1) if 'close' in d.columns else d['Close'].pct_change(1)
+        from moex_client import get_imoex
+        imoex_df = get_imoex(limit=5000)
+        if not imoex_df.empty and len(imoex_df) > 20:
+            imoex = imoex_df["Close"].reindex(d.index, method='ffill')
+            ticker_ret = close.pct_change(1)
             imoex_ret  = imoex.pct_change(1)
             d['IMOEX_corr_20'] = ticker_ret.rolling(20).corr(imoex_ret)
             cov = ticker_ret.rolling(20).cov(imoex_ret)
@@ -267,7 +273,6 @@ def calc_indicators_1h(df: pd.DataFrame) -> pd.DataFrame:
         d['IMOEX_corr_20'] = 0.0
         d['Beta_vs_IMOEX']  = 1.0
         d['Alpha_vs_IMOEX'] = 0.0
-    d['Month'] = d.index.month if hasattr(d.index, 'month') else 0
 
     return d
 

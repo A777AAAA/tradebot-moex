@@ -204,14 +204,11 @@ def get_current_price(ticker: str = None, board: str = None, market: str = None)
     return price
 
 
-def get_imoex(limit: int = 20) -> pd.DataFrame:
-    """Данные индекса IMOEX для макро-фильтра."""
+def get_imoex(limit: int = 500) -> pd.DataFrame:
+    """Данные индекса IMOEX для макро-фильтра (пагинация)."""
     try:
-        url  = f"{ISS_BASE}/engines/stock/markets/index/boards/SNDX/securities/IMOEX/candles.json"
-        from datetime import datetime, timedelta
-        date_from = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
-        data = _get(url, {"interval": 60, "limit": limit, "from": date_from})
-        raw  = _parse_candles(data)
+        raw = get_candles_multi("IMOEX", interval="60", total=limit,
+                                market="index", board="SNDX")
         if raw:
             return candles_to_df(raw)
     except Exception as e:
